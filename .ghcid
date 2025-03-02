@@ -1,3 +1,4 @@
 --command "stack repl --main-is monomer:exe:dev-test-app"
 --test ":main"
 --restart=package.yaml
+--reload=./dev-test-app/Main.hs
