@@ -17,6 +17,7 @@ data ProofLine = ProofLine {
 
 data AppModel = AppModel {
   _clickCount :: Int,
+  _conclusion :: Text,
   _proofLines :: [ProofLine]
 } deriving (Eq, Show)
 
@@ -64,8 +65,8 @@ replaceFromLookup s ((key, value):ls) = replace key value $ replaceFromLookup s 
 replaceSpecialSymbols :: Text -> Text
 replaceSpecialSymbols s = replaceFromLookup s symbolLookup
 
-exportProof :: [ProofLine] -> Text
-exportProof proof = exportProofHelper proof 0
+exportProof :: AppModel -> Text
+exportProof model = "conclusion: " <> model ^. conclusion <> "\n" <> exportProofHelper (model ^. proofLines) 0
 
 tabs :: Int -> Text
 tabs n = pack $ replicate n '\t'
@@ -98,7 +99,7 @@ buildUI wenv model = widgetTree where
         keystroke [("Enter", NextFocus 1)] $ textField (proofLines . singular (ix idx) . statement),
         spacer,
 
-        keystroke [("Enter", if isLastLine then AddLine else NextFocus 2)] $ textField (proofLines . singular (ix idx) . rule) `styleBasic` [width 100],
+        keystroke [("Enter", if isLastLine then AddLine else NextFocus 2)] $ textField (proofLines . singular (ix idx) . rule) `styleBasic` [width 175],
         spacer,
 
         trashButton (RemoveLine idx),
@@ -135,6 +136,13 @@ buildUI wenv model = widgetTree where
       -- textField (fieldInputs . singular (ix 0)),
       -- textField (fieldInputs . singular (ix 1)),
 
+      hstack [
+        label "Conclusion",
+        spacer,
+        textField conclusion
+      ] `styleBasic` [border 1 red, padding 8],
+      spacer,
+
       vscroll $ vstack [
         vstack (zipWith proofLineUI [0..] (model ^. proofLines)),
         spacer,
@@ -146,8 +154,8 @@ buildUI wenv model = widgetTree where
       hstack [
         button "Export proof" ExportProof,
         spacer,
-        widgetIf (isProofCorrect (exportProof $ model ^. proofLines)) (label "Proof is correct :)" `styleBasic` [textColor lime]),
-        widgetIf (not $ isProofCorrect (exportProof $ model ^. proofLines)) (label "Proof is not correct!" `styleBasic` [textColor red])
+        widgetIf (isProofCorrect (exportProof model)) (label "Proof is correct :)" `styleBasic` [textColor lime]),
+        widgetIf (not $ isProofCorrect (exportProof model)) (label "Proof is not correct!" `styleBasic` [textColor red])
       ]
     ] `styleBasic` [padding 10]
 
@@ -188,7 +196,7 @@ handleEvent wenv node model evt = case evt of
     where currentIndent = model ^. proofLines . singular (ix idx) . indentLevel
 
   ExportProof -> [
-    Producer (\_ -> writeFile "./export.logic" (unpack (exportProof $ model ^. proofLines)))
+    Producer (\_ -> writeFile "./export.logic" (unpack (exportProof model)))
     ]
 
 main :: IO ()
@@ -211,6 +219,7 @@ main = do
       ]
     model = AppModel {
       _clickCount = 0,
+      _conclusion = "((P -> Q) && (!R -> !Q)) -> (P -> R)",
       _proofLines = [
         ProofLine 1 "(P -> Q) && (!R -> !Q)" "Assumption",
         ProofLine 2 "p" "Assumption",

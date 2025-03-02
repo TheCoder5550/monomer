@@ -1,57 +1,21 @@
-P : Premise;
-P -> Q : Premise;
-Q : -> e 1 2;
+conclusion: ((P -> Q) && (!R -> !Q)) -> (P -> R)
 {
-	A : no rule.;
+	(P -> Q) && (!R -> !Q) : Assumption;
 	{
+		p : Assumption;
+		(P -> Q) && (!R -> !Q) : 1, Reiteration;
+		P -> Q : 3, ||E;
+		Q : 2, 4, ->E;
+		!R -> !Q : 3, &&E;
 		{
-			{
-				{
-					{
-						{
-							{
-								{
-									{
-										{
-											{
-												{
-													B!!!! : no rule.;
-												}
-											}
-										}
-									}
-								}
-							}
-						}
-					}
-				}
-			}
+			!R : Assumption;
+			!R -> !Q : 6, Reiteration;
+			!Q : 7, 8, ->E;
+			Q : 5, Reiteration;
 		}
+		!!R : 7-10, !I;
+		R : 11, !!E;
 	}
-	C : no rule.;
-	{
-		C1 : no rule.;
-		C2 : no rule.;
-		C3 : no rule.;
-	}
+	P -> R : 2-12, ->I;
 }
-. : no rule.;
-{
-	{
-		 : ;
-	}
-	 : ;
-	{
-		{
-			{
-				{
-					{
-						{
-							a : a;
-						}
-					}
-				}
-			}
-		}
-	}
-}
+((P -> Q) && (!R -> !Q)) -> (P -> R) : 1-13, ->I;
