@@ -133,11 +133,10 @@ buildUI wenv model = widgetTree where
       ] `styleBasic` [bgColor gray, padding 10])
     ] `styleBasic` [ width 250, borderR 1 gray ]
 
-  fileItem file = vstack [
+  fileItem file = box_ [expandContent, onClick (OpenFile file)] $ vstack [
       label $ _name file,
-      label $ _subname file,
-      button "Open" (OpenFile file)
-    ] `styleBasic` [borderB 1 gray, padding 8, bgColor darkGray]
+      label $ _subname file
+    ] `styleBasic` [borderB 1 gray, padding 8, bgColor darkGray, cursorHand]
 
   fileNavBar files = hscroll (hstack (map boxedLabel files))
     `styleBasic` [bgColor black, maxHeight 50, minHeight 50]
@@ -145,7 +144,7 @@ buildUI wenv model = widgetTree where
       boxedLabel f = hstack [
           button (_name f) (SetCurrentFile f) `styleBasic` [textColor white, bgColor transparent, paddingV 8, paddingH 16, radius 0, border 0 transparent],
           button "x" (CloseFile f) `styleBasic` [textColor white, bgColor transparent, radius 0, border 0 transparent]
-        ] `styleBasic` [bgColor darkGray, border 1 gray, styleIf isCurrent (bgColor darkSlateGray)]
+        ] `styleBasic` [bgColor darkGray, border 1 gray, styleIf isCurrent (bgColor darkSlateGray), styleIf isCurrent (borderB 0 transparent)]
           where isCurrent = (model ^. currentFile) == Just f
 
   editWindow = vstack [
