@@ -118,7 +118,7 @@ buildUI wenv model = widgetTree where
     ]
 
   fileWindow = vstack [
-      box (h1 "Manage proofs") `styleBasic` [padding 10],
+      box (label "Manage proofs") `styleBasic` [padding 10],
       vstack $ map fileItem (model ^. loadedFiles),
       spacer,
 
@@ -204,7 +204,7 @@ buildUI wenv model = widgetTree where
       stack = hstack [
         label_ (showt $ idx + 1) [ellipsis] `styleBasic` [textSize 12, paddingH 8, width 50],
 
-        label $ pack $ replicate (line ^. indentLevel) '|',
+        label $ pack $ take (2 * (line ^. indentLevel)) (cycle "|\t"),
 
         keystroke [("Enter", NextFocus 1)] $ textField (proofLines . singular (ix idx) . statement),
         spacer,
@@ -215,6 +215,7 @@ buildUI wenv model = widgetTree where
         trashButton (RemoveLine idx),
 
         button "<-" (OutdentLine idx),
+        spacer,
         button "->" (IndentLine idx)
         ]
           `nodeKey` showt idx
@@ -312,7 +313,7 @@ main = do
   startApp model handleEvent buildUI config
   where
     config = [
-      appWindowTitle "Dev test app",
+      appWindowTitle "● proof.logic - Proof Editor",
       appWindowIcon "./assets/images/icon.png",
       appTheme darkTheme,
       -- appFontDef "Regular" "./assets/fonts/Roboto-Regular.ttf",
