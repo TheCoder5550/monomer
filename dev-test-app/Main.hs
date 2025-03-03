@@ -99,7 +99,7 @@ buildUI wenv model = widgetTree where
         keystroke [("Enter", NextFocus 1)] $ textField (proofLines . singular (ix idx) . statement),
         spacer,
 
-        keystroke [("Enter", if isLastLine then AddLine else NextFocus 2)] $ textField (proofLines . singular (ix idx) . rule) `styleBasic` [width 175],
+        keystroke (if isLastLine then [("Enter", AddLine), ("Enter", NextFocus 4)] else [("Enter", NextFocus 4)]) $ textField (proofLines . singular (ix idx) . rule) `styleBasic` [width 175],
         spacer,
 
         trashButton (RemoveLine idx),
@@ -173,7 +173,9 @@ handleEvent wenv node model evt = case evt of
   NextFocus 1 -> [
       MoveFocusFromKey Nothing FocusFwd
     ]
-  NextFocus 2 -> [
+  NextFocus 4 -> [
+      MoveFocusFromKey Nothing FocusFwd,
+      MoveFocusFromKey Nothing FocusFwd,
       MoveFocusFromKey Nothing FocusFwd,
       MoveFocusFromKey Nothing FocusFwd
     ]
