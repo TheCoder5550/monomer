@@ -86,6 +86,7 @@ executables:
     source-dirs: dev-test-app
     dependencies:
       - monomer
+      - directory
     ghc-options:
       - -threaded
 

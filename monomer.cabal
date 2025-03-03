@@ -1,6 +1,6 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.36.0.
+-- This file has been generated from package.yaml by hpack version 0.37.0.
 --
 -- see: https://github.com/sol/hpack
 
@@ -266,6 +266,7 @@ executable dev-test-app
     , bytestring-to-vector ==0.3.*
     , containers >=0.5.11 && <0.8
     , data-default >=0.5 && <0.9
+    , directory
     , exceptions >=0.10 && <0.13
     , extra >=1.6 && <1.10
     , foreign-store >=0.2 && <1.0

@@ -4,10 +4,13 @@
 
 module Main where
 
+import System.Directory
+import Control.Concurrent (threadDelay)
 import Control.Lens
 import Monomer
 import TextShow
 import Data.Text (Text, replace, unpack, pack, intercalate)
+import qualified Data.Maybe
 
 data ProofLine = ProofLine {
   _indentLevel :: Int,
@@ -15,8 +18,22 @@ data ProofLine = ProofLine {
   _rule :: Text
 } deriving (Eq, Show)
 
+data File = File {
+  _path :: FilePath,
+  _name :: Text,
+  _subname :: Text,
+  _content :: Text
+} deriving (Eq, Show)
+
 data AppModel = AppModel {
   _clickCount :: Int,
+
+  _newFilePopupOpen :: Bool,
+  _newFileName :: Text,
+  _loadedFiles :: [File],
+  _openFiles :: [File],
+  _currentFile :: Maybe File,
+
   _conclusion :: Text,
   _proofLines :: [ProofLine]
 } deriving (Eq, Show)
@@ -29,19 +46,25 @@ data AppEvent
   | RemoveLine Int
   | OutdentLine Int
   | IndentLine Int
-  | ExportProof
+  | SetLoadedFiles [File]
+  | OpenFile File
+  | CloseFile File
+  | SetCurrentFile File
+  | OpenCreateProofPopup
+  | CreateEmptyProof Text
   deriving (Eq, Show)
 
 makeLenses 'ProofLine
+makeLenses 'File
 makeLenses 'AppModel
 
 h1 :: Text -> WidgetNode s e
 h1 t = label t `styleBasic` [ textSize 24, textFont "Bold" ]
 
 iconButton iconIdent action = button iconIdent action
-  `styleBasic` [textFont "Remix", textMiddle, textColor red, bgColor transparent, border 0 transparent]
+  `styleBasic` [textFont "Remix", textMiddle, textColor orangeRed, bgColor transparent, border 0 transparent]
 
-trashButton action = iconButton remixDeleteBinLine action
+trashButton action = iconButton remixDeleteBinFill action
 
 type SymbolDict = [(Text, Text)]
 
@@ -89,31 +112,51 @@ buildUI
   -> AppModel
   -> WidgetNode AppModel AppEvent
 buildUI wenv model = widgetTree where
-  proofLineUI idx line = stack
+  widgetTree = hstack [
+      fileWindow,
+      editWindow
+    ]
+
+  fileWindow = vstack [
+      box (h1 "Manage proofs") `styleBasic` [padding 10],
+      vstack $ map fileItem (model ^. loadedFiles),
+      spacer,
+
+      box $ button "+ New proof" OpenCreateProofPopup `styleBasic` [padding 10],
+      popup newFilePopupOpen (vstack [
+        label "This will appear on top of the widget tree",
+        spacer,
+        textField newFileName,
+        spacer,
+        let cep = (CreateEmptyProof $ model ^. newFileName) in
+          keystroke [("Enter", cep)] $ button "Create proof" cep
+      ] `styleBasic` [bgColor gray, padding 10])
+    ] `styleBasic` [ width 250, borderR 1 gray ]
+
+  fileItem file = vstack [
+      label $ _name file,
+      label $ _subname file,
+      button "Open" (OpenFile file)
+    ] `styleBasic` [borderB 1 gray, padding 8, bgColor darkGray]
+
+  fileNavBar files = hscroll (hstack (map boxedLabel files))
+    `styleBasic` [bgColor black, maxHeight 50, minHeight 50]
     where
-      stack = hstack [
-        label_ (showt $ idx + 1) [ellipsis] `styleBasic` [textSize 12, paddingH 8, width 50],
+      boxedLabel f = hstack [
+          button (_name f) (SetCurrentFile f) `styleBasic` [textColor white, bgColor transparent, paddingV 8, paddingH 16, radius 0, border 0 transparent],
+          button "x" (CloseFile f) `styleBasic` [textColor white, bgColor transparent, radius 0, border 0 transparent]
+        ] `styleBasic` [bgColor darkGray, border 1 gray, styleIf isCurrent (bgColor darkSlateGray)]
+          where isCurrent = (model ^. currentFile) == Just f
 
-        label $ pack $ replicate (line ^. indentLevel) '|',
+  editWindow = vstack [
+      fileNavBar (model ^. openFiles),
+      widgetIf (Data.Maybe.isJust (model ^. currentFile)) (proofWindow $ model ^. currentFile)
+    ]
 
-        keystroke [("Enter", NextFocus 1)] $ textField (proofLines . singular (ix idx) . statement),
-        spacer,
-
-        keystroke (if isLastLine then [("Enter", AddLine), ("Enter", NextFocus 4)] else [("Enter", NextFocus 4)]) $ textField (proofLines . singular (ix idx) . rule) `styleBasic` [width 175],
-        spacer,
-
-        trashButton (RemoveLine idx),
-
-        button "<-" (OutdentLine idx),
-        button "->" (IndentLine idx)
-        ]
-          `nodeKey` showt idx
-          `styleBasic` [paddingT 10]
-
-      isLastLine = idx == length (model ^. proofLines) - 1
-
-  widgetTree = vstack [
-      h1 "Edit proof",
+  proofWindow Nothing = label "No proof selected"
+  proofWindow (Just file) = vstack [
+      h1 $ _name file,
+      label $ _subname file,
       spacer,
       -- label "→ ¬ ∧ ∨ ⊕ ⊥ ∀ ∃ ⊢ ⊬ ⟛",
       -- label $ replaceSpecialSymbols "P -> Q && L",
@@ -140,7 +183,7 @@ buildUI wenv model = widgetTree where
         label "Conclusion",
         spacer,
         textField conclusion
-      ] `styleBasic` [border 1 red, padding 8],
+      ] `styleBasic` [paddingV 8],
       spacer,
 
       vscroll $ vstack [
@@ -152,12 +195,48 @@ buildUI wenv model = widgetTree where
       spacer,
 
       hstack [
-        button "Export proof" ExportProof,
-        spacer,
         widgetIf (isProofCorrect (exportProof model)) (label "Proof is correct :)" `styleBasic` [textColor lime]),
-        widgetIf (not $ isProofCorrect (exportProof model)) (label "Proof is not correct!" `styleBasic` [textColor red])
+        widgetIf (not $ isProofCorrect (exportProof model)) (label "Proof is not correct!" `styleBasic` [textColor pink])
       ]
     ] `styleBasic` [padding 10]
+
+  proofLineUI idx line = stack
+    where
+      stack = hstack [
+        label_ (showt $ idx + 1) [ellipsis] `styleBasic` [textSize 12, paddingH 8, width 50],
+
+        label $ pack $ replicate (line ^. indentLevel) '|',
+
+        keystroke [("Enter", NextFocus 1)] $ textField (proofLines . singular (ix idx) . statement),
+        spacer,
+
+        keystroke (if isLastLine then [("Enter", AddLine), ("Enter", NextFocus 4)] else [("Enter", NextFocus 4)]) $ textField (proofLines . singular (ix idx) . rule) `styleBasic` [width 175],
+        spacer,
+
+        trashButton (RemoveLine idx),
+
+        button "<-" (OutdentLine idx),
+        button "->" (IndentLine idx)
+        ]
+          `nodeKey` showt idx
+          `styleBasic` [paddingT 10]
+
+      isLastLine = idx == length (model ^. proofLines) - 1
+
+directoryFilesProducer :: (AppEvent -> IO ()) -> IO ()
+directoryFilesProducer sendMsg = do
+  all <- listDirectory "./myProofs"
+  sendMsg (SetLoadedFiles $ map packFile all)
+  threadDelay $ 2 * seconds
+  directoryFilesProducer sendMsg
+    where
+      seconds = 1000 * 1000
+      packFile path = File path name subname content
+        where
+          name = pack path
+          subname = "subname"
+          content = "This is the content"
+
 
 handleEvent
   :: WidgetEnv AppModel AppEvent
@@ -166,7 +245,9 @@ handleEvent
   -> AppEvent
   -> [AppEventResponse AppModel AppEvent]
 handleEvent wenv node model evt = case evt of
-  AppInit -> []
+  AppInit -> [
+      Producer directoryFilesProducer
+    ]
   AppIncrease -> [Model (model & clickCount +~ 1)]
 
   -- Bruh
@@ -197,9 +278,35 @@ handleEvent wenv node model evt = case evt of
   IndentLine idx -> [Model $ model & proofLines . singular (ix idx) . indentLevel .~ currentIndent + 1]
     where currentIndent = model ^. proofLines . singular (ix idx) . indentLevel
 
-  ExportProof -> [
-    Producer (\_ -> writeFile "./export.logic" (unpack (exportProof model)))
+  OpenCreateProofPopup -> [
+      Model $ model & newFilePopupOpen .~ True
     ]
+
+  CreateEmptyProof fileName -> [
+      Producer (\_ -> writeFile ("./myProofs/" <> unpack fileName <> ".logic") ""),
+      Model $ model
+        & newFilePopupOpen .~ False
+        & newFileName .~ ""
+    ]
+
+  SetLoadedFiles fs -> [
+      Model $ model & loadedFiles .~ fs
+    ]
+
+  OpenFile f -> [
+      Model $ model
+        & openFiles .~ (model ^. openFiles ++ [f | f `notElem` model ^. openFiles])
+        & (currentFile ?~ f)
+    ]
+
+  CloseFile f -> [
+      Model $ model
+        & openFiles .~ filter (f/=) (model ^. openFiles)
+        & currentFile .~ (if c == Just f then maybeHead (model ^. openFiles) else c)
+    ]
+    where c = model ^. currentFile
+
+  SetCurrentFile f -> [ Model $ model & (currentFile ?~ f) ]
 
 main :: IO ()
 main = do
@@ -221,6 +328,11 @@ main = do
       ]
     model = AppModel {
       _clickCount = 0,
+      _newFileName = "",
+      _newFilePopupOpen = False,
+      _loadedFiles = [],
+      _openFiles = [],
+      _currentFile = Nothing,
       _conclusion = "((P -> Q) && (!R -> !Q)) -> (P -> R)",
       _proofLines = [
         ProofLine 1 "(P -> Q) && (!R -> !Q)" "Assumption",
@@ -243,3 +355,8 @@ main = do
 removeIdx :: Int -> [a] -> [a]
 removeIdx idx lst = part1 ++ drop 1 part2 where
   (part1, part2) = splitAt idx lst
+
+-- https://www.youtube.com/watch?v=aS8O-F0ICxw
+maybeHead :: [a] -> Maybe a
+maybeHead [] = Nothing
+maybeHead (h:t) = Just h
