@@ -72,6 +72,7 @@ symbolLookup :: SymbolDict
 symbolLookup = [
   ("->", "→"),
   ("!", "¬"),
+  ("-", "¬"),
   ("&&", "∧"),
   ("||", "∨"),
   ("bot", "⊥"),
